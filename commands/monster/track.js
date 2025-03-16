@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const logger = require('../../utils/logger');
 
-// Database setup
+// Database setup with proper error handling
 const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     if (err) {
         logger.error('Database connection error:', err);
@@ -13,7 +13,7 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
 
     // Create encounters table if it doesn't exist
     db.run(
-        "CREATE TABLE IF NOT EXISTS encounters (user_id TEXT, monster_name TEXT, size TEXT, PRIMARY KEY (user_id, monster_name, size))"
+        "CREATE TABLE IF NOT EXISTS encounters (user_id TEXT, monster_name TEXT, size TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, monster_name, size))"
     );
 });
 
@@ -49,13 +49,16 @@ async function fetchMonsters() {
 module.exports = {
     name: 'track',
     description: 'Track monster encounters and sizes',
-    async execute(message, args) {
+    async execute(interaction) {
         try {
-            logger.info(`User ${message.author.tag} initiated track command`);
+            logger.info(`User ${interaction.user.tag} initiated track command`);
             const monsters = await fetchMonsters();
 
             if (monsters.length === 0) {
-                return message.reply('Could not fetch monster list. Please try again later.');
+                return interaction.reply({
+                    content: 'Could not fetch monster list. Please try again later.',
+                    ephemeral: true
+                });
             }
 
             const monsterMenu = new StringSelectMenuBuilder()
@@ -64,7 +67,8 @@ module.exports = {
                 .addOptions(
                     monsters.map(monster => ({
                         label: monster.name,
-                        value: monster.name.toLowerCase()
+                        value: monster.name.toLowerCase(),
+                        description: `Track ${monster.name}`
                     })).slice(0, 25)
                 );
 
@@ -79,15 +83,21 @@ module.exports = {
             const row1 = new ActionRowBuilder().addComponents(monsterMenu);
             const row2 = new ActionRowBuilder().addComponents(sizeMenu);
 
-            await message.reply({
-                content: 'Select a monster and size:',
-                components: [row1, row2]
+            await interaction.reply({
+                content: 'Select a monster and size to track:',
+                components: [row1, row2],
+                ephemeral: true
             });
 
             logger.info('Track command executed successfully');
         } catch (error) {
             logger.error('Error in track command:', error);
-            message.reply('There was an error executing the track command.');
+            if (!interaction.replied) {
+                await interaction.reply({
+                    content: 'There was an error executing the track command.',
+                    ephemeral: true
+                });
+            }
         }
     }
 };

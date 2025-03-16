@@ -27,10 +27,15 @@ module.exports = {
             logger.info(`Received interaction type: ${interaction.type}`);
 
             if (interaction.isChatInputCommand()) {
+                logger.info(`Processing command: ${interaction.commandName}`);
+
                 if (interaction.commandName === 'track') {
                     const monsters = await fetchMonsters();
                     if (monsters.length === 0) {
-                        return interaction.reply('Could not fetch monster list. Please try again later.');
+                        return interaction.reply({
+                            content: 'Could not fetch monster list. Please try again later.',
+                            ephemeral: true
+                        });
                     }
 
                     const monsterMenu = new StringSelectMenuBuilder()
@@ -59,11 +64,21 @@ module.exports = {
                         components: [row1, row2],
                         ephemeral: true
                     });
-                } else {
-                    const command = client.commands.get(interaction.commandName);
-                    if (!command) return;
-
-                    await command.execute(interaction);
+                } else if (interaction.commandName === 'progress') {
+                    logger.info(`Progress command received from user ${interaction.user.id}`);
+                    try {
+                        const progressCommand = require('../commands/monster/progress');
+                        await progressCommand.execute(interaction);
+                        logger.info('Progress command executed successfully');
+                    } catch (error) {
+                        logger.error('Error executing progress command:', error);
+                        if (!interaction.replied) {
+                            await interaction.reply({
+                                content: 'There was an error executing the progress command.',
+                                ephemeral: true
+                            });
+                        }
+                    }
                 }
             } else if (interaction.isStringSelectMenu()) {
                 const userId = interaction.user.id;
@@ -111,6 +126,7 @@ module.exports = {
                                 content: `Successfully logged **${size}** **${selectedMonster}** encounter!`,
                                 ephemeral: true
                             });
+                            logger.info(`Successfully logged encounter for user ${userId}`);
                         }
                     );
                 }

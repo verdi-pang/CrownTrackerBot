@@ -1,44 +1,101 @@
 const sqlite3 = require('sqlite3').verbose();
 const logger = require('../../utils/logger');
 
-const db = new sqlite3.Database('./monster_tracker.db');
+// Database connection with proper error handling
+const db = new sqlite3.Database('./monster_tracker.db', (err) => {
+    if (err) {
+        logger.error('Database connection error:', err);
+        return;
+    }
+    logger.info('Connected to monster tracking database for progress command');
+});
 
 module.exports = {
     name: 'progress',
     description: 'Check your logged monster encounters',
-    execute(message, args) {
+    async execute(interaction) {
         try {
-            const userId = message.author.id;
-            
-            db.all(
-                "SELECT monster_name, size FROM encounters WHERE user_id = ?",
-                [userId],
-                (err, rows) => {
-                    if (err) {
-                        logger.error('Database query error:', err);
-                        return message.reply('Error fetching progress.');
-                    }
-                    
-                    if (!rows.length) {
-                        return message.reply("You haven't logged any encounters yet.");
-                    }
+            const userId = interaction.user?.id;
+            logger.info(`Progress command executed by user: ${userId}`);
 
-                    const progress = rows
-                        .map(row => `🦖 **${row.monster_name}** (${row.size})`)
-                        .join('\n');
-                    
-                    message.reply({
-                        embeds: [{
+            if (!userId) {
+                logger.error('No user ID found in interaction');
+                await interaction.reply({
+                    content: 'Could not identify user. Please try again.',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            // Query encounters from database
+            logger.info(`Attempting to query database for user ${userId}`);
+
+            db.all(
+                "SELECT monster_name, size, created_at FROM encounters WHERE user_id = ? ORDER BY created_at DESC",
+                [userId],
+                async (err, rows) => {
+                    try {
+                        if (err) {
+                            logger.error(`Database query error for user ${userId}:`, err);
+                            await interaction.reply({
+                                content: 'Error fetching your progress. Please try again later.',
+                                ephemeral: true
+                            });
+                            return;
+                        }
+
+                        logger.info(`Query completed. Found ${rows ? rows.length : 0} encounters`);
+
+                        if (!rows || rows.length === 0) {
+                            logger.info(`No encounters found for user ${userId}`);
+                            await interaction.reply({
+                                content: "You haven't logged any monster encounters yet. Use /track to start tracking!",
+                                ephemeral: true
+                            });
+                            return;
+                        }
+
+                        logger.info(`Processing ${rows.length} encounters for user ${userId}`);
+                        const progress = rows
+                            .map(row => `🦖 **${row.monster_name}** (${row.size})`)
+                            .join('\n');
+
+                        logger.info('Creating embed with progress data');
+                        const embed = {
                             title: '📊 Your Monster Tracking Progress',
                             description: progress,
-                            color: 0x0099ff
-                        }]
-                    });
+                            color: 0x0099ff,
+                            footer: {
+                                text: `Total Encounters: ${rows.length}`
+                            },
+                            timestamp: new Date()
+                        };
+
+                        logger.info('Sending reply with progress embed');
+                        await interaction.reply({
+                            embeds: [embed],
+                            ephemeral: true
+                        });
+                        logger.info('Progress command completed successfully');
+                    } catch (error) {
+                        logger.error('Error handling progress response:', error);
+                        if (!interaction.replied) {
+                            await interaction.reply({
+                                content: 'An error occurred while displaying your progress.',
+                                ephemeral: true
+                            });
+                        }
+                    }
                 }
             );
         } catch (error) {
-            logger.error('Error in progress command:', error);
-            message.reply('There was an error executing the progress command.');
+            logger.error('Unhandled error in progress command:', error);
+            if (!interaction.replied) {
+                await interaction.reply({
+                    content: 'An unexpected error occurred. Please try again later.',
+                    ephemeral: true
+                });
+            }
         }
     }
 };

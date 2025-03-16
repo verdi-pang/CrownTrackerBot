@@ -10,7 +10,8 @@ async function registerSlashCommands(client) {
             },
             {
                 name: 'progress',
-                description: 'Check your logged encounters'
+                description: 'Check your logged encounters',
+                type: 1 // Type 1 is for CHAT_INPUT commands
             }
         ];
 
