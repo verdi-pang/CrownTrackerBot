@@ -1,6 +1,24 @@
 const logger = require('../utils/logger');
 const sqlite3 = require('sqlite3').verbose();
+const fetch = require('node-fetch');
+const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const db = new sqlite3.Database('./monster_tracker.db');
+
+const MONSTER_API_URL = "https://mhw-db.com/monsters";
+
+async function fetchMonsters() {
+    try {
+        logger.info('Fetching monsters from API...');
+        const response = await fetch(MONSTER_API_URL);
+        const monsters = await response.json();
+        return monsters.map(monster => ({
+            name: monster.name
+        }));
+    } catch (error) {
+        logger.error('Error fetching monster list:', error);
+        return [];
+    }
+}
 
 module.exports = {
     name: 'interactionCreate',
@@ -9,10 +27,44 @@ module.exports = {
             logger.info(`Received interaction type: ${interaction.type}`);
 
             if (interaction.isChatInputCommand()) {
-                const command = client.commands.get(interaction.commandName);
-                if (!command) return;
+                if (interaction.commandName === 'track') {
+                    const monsters = await fetchMonsters();
+                    if (monsters.length === 0) {
+                        return interaction.reply('Could not fetch monster list. Please try again later.');
+                    }
 
-                await command.execute(interaction);
+                    const monsterMenu = new StringSelectMenuBuilder()
+                        .setCustomId('select_monster')
+                        .setPlaceholder('Choose a monster')
+                        .addOptions(
+                            monsters.map(monster => ({
+                                label: monster.name,
+                                value: monster.name.toLowerCase()
+                            })).slice(0, 25)
+                        );
+
+                    const sizeMenu = new StringSelectMenuBuilder()
+                        .setCustomId('select_size')
+                        .setPlaceholder('Choose a size')
+                        .addOptions([
+                            { label: 'Smallest', value: 'smallest', description: 'Record as smallest seen' },
+                            { label: 'Largest', value: 'largest', description: 'Record as largest seen' }
+                        ]);
+
+                    const row1 = new ActionRowBuilder().addComponents(monsterMenu);
+                    const row2 = new ActionRowBuilder().addComponents(sizeMenu);
+
+                    await interaction.reply({
+                        content: 'Select a monster and size:',
+                        components: [row1, row2],
+                        ephemeral: true
+                    });
+                } else {
+                    const command = client.commands.get(interaction.commandName);
+                    if (!command) return;
+
+                    await command.execute(interaction);
+                }
             } else if (interaction.isStringSelectMenu()) {
                 const userId = interaction.user.id;
                 logger.info(`Select menu interaction from user ${userId}`);
@@ -21,7 +73,6 @@ module.exports = {
                     const selectedMonster = interaction.values[0];
                     logger.info(`Selected monster: ${selectedMonster}`);
 
-                    // Store the selection in a temporary way that works with Discord.js
                     interaction.client.monsterSelections = interaction.client.monsterSelections || new Map();
                     interaction.client.monsterSelections.set(userId, selectedMonster);
 
@@ -55,9 +106,7 @@ module.exports = {
                                 });
                             }
 
-                            // Clear the temporary selection
                             interaction.client.monsterSelections.delete(userId);
-
                             await interaction.reply({
                                 content: `Successfully logged **${size}** **${selectedMonster}** encounter!`,
                                 ephemeral: true

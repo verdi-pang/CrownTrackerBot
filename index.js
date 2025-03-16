@@ -5,14 +5,16 @@ const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./utils/logger');
 
-// Updated intents configuration
+// Updated intents configuration with all required intents
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildIntegrations
     ]
 });
 
