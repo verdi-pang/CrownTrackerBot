@@ -184,14 +184,3 @@ module.exports = {
         }
     }
 };
-const { SlashCommandBuilder } = require('discord.js');
-
-module.exports = {
-    name: 'missing',
-    data: new SlashCommandBuilder()
-        .setName('missing')
-        .setDescription('Show monsters you have not yet tracked'),
-    async execute(interaction) {
-        await interaction.reply('Showing missing monsters...');
-    }
-};

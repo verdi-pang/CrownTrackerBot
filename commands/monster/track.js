@@ -101,14 +101,3 @@ module.exports = {
         }
     }
 };
-const { SlashCommandBuilder } = require('discord.js');
-
-module.exports = {
-    name: 'track',
-    data: new SlashCommandBuilder()
-        .setName('track')
-        .setDescription('Track a monster encounter'),
-    async execute(interaction) {
-        await interaction.reply('Monster tracking started!');
-    }
-};

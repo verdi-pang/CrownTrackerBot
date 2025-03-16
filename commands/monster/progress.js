@@ -98,14 +98,3 @@ module.exports = {
         }
     }
 };
-const { SlashCommandBuilder } = require('discord.js');
-
-module.exports = {
-    name: 'progress',
-    data: new SlashCommandBuilder()
-        .setName('progress')
-        .setDescription('Check your logged encounters'),
-    async execute(interaction) {
-        await interaction.reply('Showing progress...');
-    }
-};
