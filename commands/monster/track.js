@@ -18,7 +18,7 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
 });
 
 // API URL for monster data
-const MONSTER_API_URL = "https://mhw-db.com/monsters";
+const MONSTER_API_URL = "https://mhw-db.com/monsters?type=large";
 
 async function fetchMonsters() {
     try {
