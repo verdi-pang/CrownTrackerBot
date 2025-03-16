@@ -1,24 +1,7 @@
 const logger = require('../utils/logger');
 const sqlite3 = require('sqlite3').verbose();
-const fetch = require('node-fetch');
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const db = new sqlite3.Database('./monster_tracker.db');
-
-const MONSTER_API_URL = "https://mhw-db.com/monsters";
-
-async function fetchMonsters() {
-    try {
-        logger.info('Fetching monsters from API...');
-        const response = await fetch(MONSTER_API_URL);
-        const monsters = await response.json();
-        return monsters.map(monster => ({
-            name: monster.name
-        }));
-    } catch (error) {
-        logger.error('Error fetching monster list:', error);
-        return [];
-    }
-}
 
 module.exports = {
     name: 'interactionCreate',
@@ -27,73 +10,9 @@ module.exports = {
             logger.info(`Received interaction type: ${interaction.type}`);
 
             if (interaction.isChatInputCommand()) {
-                logger.info(`Processing command: ${interaction.commandName}`);
-
-                if (interaction.commandName === 'track') {
-                    const monsters = await fetchMonsters();
-                    if (monsters.length === 0) {
-                        return interaction.reply({
-                            content: 'Could not fetch monster list. Please try again later.',
-                            ephemeral: true
-                        });
-                    }
-
-                    const monsterMenu = new StringSelectMenuBuilder()
-                        .setCustomId('select_monster')
-                        .setPlaceholder('Choose a monster')
-                        .addOptions(
-                            monsters.map(monster => ({
-                                label: monster.name,
-                                value: monster.name.toLowerCase()
-                            })).slice(0, 25)
-                        );
-
-                    const sizeMenu = new StringSelectMenuBuilder()
-                        .setCustomId('select_size')
-                        .setPlaceholder('Choose a size')
-                        .addOptions([
-                            { label: 'Smallest', value: 'smallest', description: 'Record as smallest seen' },
-                            { label: 'Largest', value: 'largest', description: 'Record as largest seen' }
-                        ]);
-
-                    const row1 = new ActionRowBuilder().addComponents(monsterMenu);
-                    const row2 = new ActionRowBuilder().addComponents(sizeMenu);
-
-                    await interaction.reply({
-                        content: 'Select a monster and size:',
-                        components: [row1, row2],
-                        ephemeral: true
-                    });
-                } else if (interaction.commandName === 'progress') {
-                    logger.info(`Progress command received from user ${interaction.user.id}`);
-                    try {
-                        const progressCommand = require('../commands/monster/progress');
-                        await progressCommand.execute(interaction);
-                        logger.info('Progress command executed successfully');
-                    } catch (error) {
-                        logger.error('Error executing progress command:', error);
-                        if (!interaction.replied) {
-                            await interaction.reply({
-                                content: 'There was an error executing the progress command.',
-                                ephemeral: true
-                            });
-                        }
-                    }
-                } else if (interaction.commandName === 'missing') {
-                    logger.info(`Missing monsters command received from user ${interaction.user.id}`);
-                    try {
-                        const missingCommand = require('../commands/monster/missing');
-                        await missingCommand.execute(interaction);
-                        logger.info('Missing monsters command executed successfully');
-                    } catch (error) {
-                        logger.error('Error executing missing monsters command:', error);
-                        if (!interaction.replied) {
-                            await interaction.reply({
-                                content: 'There was an error executing the missing monsters command.',
-                                ephemeral: true
-                            });
-                        }
-                    }
+                const command = require(`../commands/monster/${interaction.commandName}.js`);
+                if (command) {
+                    await command.execute(interaction);
                 }
             } else if (interaction.isStringSelectMenu()) {
                 const userId = interaction.user.id;
@@ -103,16 +22,53 @@ module.exports = {
                     const selectedMonster = interaction.values[0];
                     logger.info(`Selected monster: ${selectedMonster}`);
 
-                    interaction.client.monsterSelections = interaction.client.monsterSelections || new Map();
-                    interaction.client.monsterSelections.set(userId, selectedMonster);
+                    // Get tracked sizes for this monster
+                    db.all(
+                        "SELECT size FROM encounters WHERE user_id = ? AND LOWER(monster_name) = LOWER(?)",
+                        [userId, selectedMonster],
+                        async (err, rows) => {
+                            if (err) {
+                                logger.error('Database query error:', err);
+                                return interaction.reply({
+                                    content: 'Error checking tracked sizes.',
+                                    ephemeral: true
+                                });
+                            }
 
-                    await interaction.reply({
-                        content: `Selected monster: **${selectedMonster}**. Now choose a size!`,
-                        ephemeral: true
-                    });
-                }
+                            const trackedSizes = new Set(rows.map(row => row.size));
 
-                if (interaction.customId === 'select_size') {
+                            // Only show untracked sizes
+                            const availableSizes = [
+                                { label: 'Smallest', value: 'smallest', description: 'Record as smallest seen' },
+                                { label: 'Largest', value: 'largest', description: 'Record as largest seen' }
+                            ].filter(size => !trackedSizes.has(size.value));
+
+                            if (availableSizes.length === 0) {
+                                await interaction.reply({
+                                    content: `You have already tracked both sizes for ${selectedMonster}!`,
+                                    ephemeral: true
+                                });
+                                return;
+                            }
+
+                            const sizeMenu = new StringSelectMenuBuilder()
+                                .setCustomId('select_size')
+                                .setPlaceholder('Choose a size')
+                                .addOptions(availableSizes);
+
+                            const row = new ActionRowBuilder().addComponents(sizeMenu);
+
+                            interaction.client.monsterSelections = interaction.client.monsterSelections || new Map();
+                            interaction.client.monsterSelections.set(userId, selectedMonster);
+
+                            await interaction.reply({
+                                content: `Selected monster: **${selectedMonster}**\nChoose an available size:`,
+                                components: [row],
+                                ephemeral: true
+                            });
+                        }
+                    );
+                } else if (interaction.customId === 'select_size') {
                     const selectedMonster = interaction.client.monsterSelections?.get(userId);
                     if (!selectedMonster) {
                         return interaction.reply({

@@ -11,11 +11,12 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     logger.info('Connected to monster tracking database for missing command');
 });
 
-const MONSTER_API_URL = "https://mhw-db.com/monsters";
+// API URL updated to query only large monsters
+const MONSTER_API_URL = "https://mhw-db.com/monsters?type=large";
 
 async function fetchAllMonsters() {
     try {
-        logger.info('Fetching all monsters from API...');
+        logger.info('Fetching all large monsters from API...');
         const response = await fetch(MONSTER_API_URL);
         if (!response.ok) {
             logger.error(`API response not OK: ${response.status} ${response.statusText}`);
@@ -23,12 +24,12 @@ async function fetchAllMonsters() {
         }
 
         const monsters = await response.json();
-        logger.info(`Raw API response received with ${monsters.length} monsters`);
+        logger.info(`Raw API response received with ${monsters.length} large monsters`);
 
         // Extract just the names from the monster data
         const monsterNames = monsters.map(monster => monster.name.toLowerCase());
 
-        logger.info(`Processed ${monsterNames.length} monster names: ${JSON.stringify(monsterNames.slice(0, 3))}`);
+        logger.info(`Processed ${monsterNames.length} large monster names: ${JSON.stringify(monsterNames.slice(0, 3))}`);
         return monsterNames;
     } catch (error) {
         logger.error('Error fetching monster list:', error);
@@ -107,10 +108,10 @@ module.exports = {
                         );
 
                         // Find missing monsters for each size
-                        const missingSmallest = allMonsters.filter(monster => 
+                        const missingSmallest = allMonsters.filter(monster =>
                             !trackedSmallest.has(monster)
                         );
-                        const missingLargest = allMonsters.filter(monster => 
+                        const missingLargest = allMonsters.filter(monster =>
                             !trackedLargest.has(monster)
                         );
 
