@@ -10,31 +10,19 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
         return;
     }
     logger.info('Connected to the monster tracking database.');
+
+    // Create encounters table if it doesn't exist
+    db.run(
+        "CREATE TABLE IF NOT EXISTS encounters (user_id TEXT, monster_name TEXT, size TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, monster_name, size))"
+    );
 });
 
-// API URL for monster data - updated to query only large monsters
-const MONSTER_API_URL = "https://mhw-db.com/monsters?type=large";
-
-async function getTrackedMonsters(userId) {
-    return new Promise((resolve, reject) => {
-        db.all(
-            "SELECT monster_name, size FROM encounters WHERE user_id = ?",
-            [userId],
-            (err, rows) => {
-                if (err) {
-                    logger.error('Error fetching tracked monsters:', err);
-                    reject(err);
-                    return;
-                }
-                resolve(rows || []);
-            }
-        );
-    });
-}
+// API URL for monster data
+const MONSTER_API_URL = "https://mhw-db.com/monsters";
 
 async function fetchMonsters() {
     try {
-        logger.info('Fetching large monsters from API...');
+        logger.info('Fetching monsters from API...');
         const response = await fetch(MONSTER_API_URL);
 
         if (!response.ok) {
@@ -43,13 +31,14 @@ async function fetchMonsters() {
         }
 
         const monsters = await response.json();
-        logger.info(`Raw API response received with ${monsters.length} large monsters`);
+        logger.info(`Raw API response received with ${monsters.length} monsters`);
 
+        // Extract just the names from the monster data
         const monsterNames = monsters.map(monster => ({
             name: monster.name
         }));
 
-        logger.info(`Processed ${monsterNames.length} large monster names`);
+        logger.info(`Processed ${monsterNames.length} monster names: ${JSON.stringify(monsterNames.slice(0, 3))}`);
         return monsterNames;
     } catch (error) {
         logger.error('Error fetching monster list:', error);
@@ -62,42 +51,12 @@ module.exports = {
     description: 'Track monster encounters and sizes',
     async execute(interaction) {
         try {
-            const userId = interaction.user.id;
             logger.info(`User ${interaction.user.tag} initiated track command`);
-
-            // Get all monsters from API
             const monsters = await fetchMonsters();
+
             if (monsters.length === 0) {
                 return interaction.reply({
                     content: 'Could not fetch monster list. Please try again later.',
-                    ephemeral: true
-                });
-            }
-
-            // Get user's tracked monsters
-            const trackedMonsters = await getTrackedMonsters(userId);
-
-            // Create sets for tracked monsters by size
-            const trackedSmallest = new Set(
-                trackedMonsters
-                    .filter(row => row.size === 'smallest')
-                    .map(row => row.monster_name.toLowerCase())
-            );
-            const trackedLargest = new Set(
-                trackedMonsters
-                    .filter(row => row.size === 'largest')
-                    .map(row => row.monster_name.toLowerCase())
-            );
-
-            // Filter available monsters based on what's left to track
-            const availableMonsters = monsters.filter(monster => {
-                const monsterName = monster.name.toLowerCase();
-                return !trackedSmallest.has(monsterName) || !trackedLargest.has(monsterName);
-            });
-
-            if (availableMonsters.length === 0) {
-                return interaction.reply({
-                    content: '🎉 Congratulations! You have tracked all monsters in both size categories!',
                     ephemeral: true
                 });
             }
@@ -106,23 +65,20 @@ module.exports = {
                 .setCustomId('select_monster')
                 .setPlaceholder('Choose a monster')
                 .addOptions(
-                    availableMonsters.map(monster => ({
+                    monsters.map(monster => ({
                         label: monster.name,
                         value: monster.name.toLowerCase(),
                         description: `Track ${monster.name}`
                     })).slice(0, 25)
                 );
 
-            // Only show size options that haven't been tracked for the selected monster
             const sizeMenu = new StringSelectMenuBuilder()
                 .setCustomId('select_size')
                 .setPlaceholder('Choose a size')
-                .addOptions(
-                    [
-                        { label: 'Smallest', value: 'smallest', description: 'Record as smallest seen' },
-                        { label: 'Largest', value: 'largest', description: 'Record as largest seen' }
-                    ]
-                );
+                .addOptions([
+                    { label: 'Smallest', value: 'smallest', description: 'Record as smallest seen' },
+                    { label: 'Largest', value: 'largest', description: 'Record as largest seen' }
+                ]);
 
             const row1 = new ActionRowBuilder().addComponents(monsterMenu);
             const row2 = new ActionRowBuilder().addComponents(sizeMenu);

@@ -6,11 +6,22 @@ module.exports = {
     name: 'messageCreate',
     execute(message, client) {
         try {
-            // Only handle messages that need database access
-            // Slash commands are handled in interactionCreate.js
-            logger.info(`Message received from ${message.author.tag}`);
+            const prefix = process.env.PREFIX || '!';
+
+            if (!message.content.startsWith(prefix) || message.author.bot) return;
+
+            const args = message.content.slice(prefix.length).trim().split(/ +/);
+            const commandName = args.shift().toLowerCase();
+
+            logger.info(`Received command: ${commandName}`);
+
+            const command = client.commands.get(commandName);
+            if (!command) return;
+
+            command.execute(message, args);
         } catch (error) {
             logger.error('Error handling message:', error);
+            message.reply('There was an error executing that command.');
         }
     }
 };
