@@ -1,8 +1,5 @@
 const logger = require('../utils/logger');
-const { registerSlashCommands } = require('../handlers/slashCommandHandler');
 const sqlite3 = require('sqlite3').verbose();
-const { REST } = require('@discordjs/rest');
-const { Routes } = require('discord.js');
 
 // Ensure database table exists and verify connection
 function initializeDatabase() {
@@ -55,20 +52,9 @@ module.exports = {
     once: true,
     async execute(client) {
         try {
-            logger.info(`Logged in as ${client.user.tag}`);
             logger.info(`Bot ID: ${client.user.id}`);
-            client.user.setActivity('Use /track to log monsters', { type: 'PLAYING' });
-
             // Initialize and verify database
             initializeDatabase();
-
-            // Register slash commands only once globally
-            await registerSlashCommands(client);
-
-            // Verify registered commands
-            const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-            const registeredCommands = await rest.get(Routes.applicationCommands(client.user.id));
-            logger.info(`Currently registered commands: ${registeredCommands.map(cmd => cmd.name).join(', ')}`);
         } catch (error) {
             logger.error('Error in ready event:', error);
         }

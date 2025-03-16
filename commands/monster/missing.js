@@ -63,7 +63,7 @@ module.exports = {
                             return;
                         }
 
-                        const trackedMonsters = rows.map(row => row.monster_name);
+                        const trackedMonsters = rows ? rows.map(row => row.monster_name) : [];
                         logger.info(`User ${userId} has tracked ${trackedMonsters.length} monsters: ${trackedMonsters.join(', ')}`);
 
                         const missingMonsters = allMonsters.filter(monster => 
