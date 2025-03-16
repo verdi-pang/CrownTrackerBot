@@ -24,16 +24,13 @@ module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
         try {
-            logger.info(`Received interaction type: ${interaction.type} from user ${interaction.user.tag}`);
+            logger.info(`Received interaction type: ${interaction.type}`);
 
             if (interaction.isChatInputCommand()) {
                 if (interaction.commandName === 'track') {
                     const monsters = await fetchMonsters();
                     if (monsters.length === 0) {
-                        return await interaction.reply({
-                            content: 'Could not fetch monster list. Please try again later.',
-                            ephemeral: true
-                        });
+                        return interaction.reply('Could not fetch monster list. Please try again later.');
                     }
 
                     const monsterMenu = new StringSelectMenuBuilder()
@@ -62,11 +59,6 @@ module.exports = {
                         components: [row1, row2],
                         ephemeral: true
                     });
-                } else if (interaction.commandName === 'progress') {
-                    // Get the progress command and execute it
-                    const command = client.commands.get('progress');
-                    if (!command) return;
-                    await command.execute(interaction);
                 } else {
                     const command = client.commands.get(interaction.commandName);
                     if (!command) return;
@@ -93,7 +85,7 @@ module.exports = {
                 if (interaction.customId === 'select_size') {
                     const selectedMonster = interaction.client.monsterSelections?.get(userId);
                     if (!selectedMonster) {
-                        return await interaction.reply({
+                        return interaction.reply({
                             content: 'Please select a monster first!',
                             ephemeral: true
                         });
@@ -108,7 +100,7 @@ module.exports = {
                         async (err) => {
                             if (err) {
                                 logger.error('Database insert error:', err);
-                                return await interaction.reply({
+                                return interaction.reply({
                                     content: 'Error logging encounter.',
                                     ephemeral: true
                                 });
