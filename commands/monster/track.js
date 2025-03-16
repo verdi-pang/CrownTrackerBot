@@ -22,7 +22,7 @@ const MONSTER_API_URL = "https://mhw-db.com/monsters";
 
 async function fetchMonsters() {
     try {
-        logger.info('Fetching monsters from API...');
+        logger.info(`Starting monster fetch from ${MONSTER_API_URL}`);
         const response = await fetch(MONSTER_API_URL);
 
         if (!response.ok) {
@@ -38,10 +38,11 @@ async function fetchMonsters() {
             name: monster.name
         }));
 
-        logger.info(`Processed ${monsterNames.length} monster names: ${JSON.stringify(monsterNames.slice(0, 3))}`);
+        logger.info(`Processed monster names (first 3): ${JSON.stringify(monsterNames.slice(0, 3))}`);
         return monsterNames;
     } catch (error) {
         logger.error('Error fetching monster list:', error);
+        logger.error('Error details:', error.message);
         return [];
     }
 }
@@ -51,12 +52,15 @@ module.exports = {
     description: 'Track monster encounters and sizes',
     async execute(message, args) {
         try {
-            logger.info(`User ${message.author.tag} initiated track command`);
+            logger.info(`User ${message.author.tag} initiated track command with prefix: ${process.env.PREFIX}`);
             const monsters = await fetchMonsters();
 
             if (monsters.length === 0) {
+                logger.error('No monsters fetched from API');
                 return message.reply('Could not fetch monster list. Please try again later.');
             }
+
+            logger.info(`Creating dropdown menu with ${monsters.length} monsters`);
 
             const monsterMenu = new StringSelectMenuBuilder()
                 .setCustomId('select_monster')
@@ -87,6 +91,7 @@ module.exports = {
             logger.info('Track command executed successfully');
         } catch (error) {
             logger.error('Error in track command:', error);
+            logger.error('Error details:', error.message);
             message.reply('There was an error executing the track command.');
         }
     }

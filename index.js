@@ -5,6 +5,9 @@ const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./utils/logger');
 
+// Set default prefix if not in environment variables
+process.env.PREFIX = process.env.PREFIX || '!';
+
 // Updated intents configuration
 const client = new Client({
     intents: [
