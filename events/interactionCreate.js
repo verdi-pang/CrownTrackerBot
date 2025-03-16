@@ -79,6 +79,21 @@ module.exports = {
                             });
                         }
                     }
+                } else if (interaction.commandName === 'missing') {
+                    logger.info(`Missing monsters command received from user ${interaction.user.id}`);
+                    try {
+                        const missingCommand = require('../commands/monster/missing');
+                        await missingCommand.execute(interaction);
+                        logger.info('Missing monsters command executed successfully');
+                    } catch (error) {
+                        logger.error('Error executing missing monsters command:', error);
+                        if (!interaction.replied) {
+                            await interaction.reply({
+                                content: 'There was an error executing the missing monsters command.',
+                                ephemeral: true
+                            });
+                        }
+                    }
                 }
             } else if (interaction.isStringSelectMenu()) {
                 const userId = interaction.user.id;

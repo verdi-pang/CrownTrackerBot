@@ -1,6 +1,8 @@
 const logger = require('../utils/logger');
 const { registerSlashCommands } = require('../handlers/slashCommandHandler');
 const sqlite3 = require('sqlite3').verbose();
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord.js');
 
 // Ensure database table exists and verify connection
 function initializeDatabase() {
@@ -20,13 +22,11 @@ function initializeDatabase() {
 
             if (!row) {
                 logger.info('Creating encounters table...');
-                // Create encounters table if it doesn't exist
                 db.run(`
                     CREATE TABLE IF NOT EXISTS encounters (
                         user_id TEXT,
                         monster_name TEXT,
                         size TEXT,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         PRIMARY KEY (user_id, monster_name, size)
                     )
                 `, (err) => {
@@ -38,7 +38,6 @@ function initializeDatabase() {
                 });
             } else {
                 logger.info('Encounters table already exists');
-                // Verify table structure
                 db.all("PRAGMA table_info(encounters)", (err, columns) => {
                     if (err) {
                         logger.error('Error checking table structure:', err);
@@ -63,8 +62,13 @@ module.exports = {
             // Initialize and verify database
             initializeDatabase();
 
-            // Register slash commands
+            // Register slash commands only once globally
             await registerSlashCommands(client);
+
+            // Verify registered commands
+            const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+            const registeredCommands = await rest.get(Routes.applicationCommands(client.user.id));
+            logger.info(`Currently registered commands: ${registeredCommands.map(cmd => cmd.name).join(', ')}`);
         } catch (error) {
             logger.error('Error in ready event:', error);
         }

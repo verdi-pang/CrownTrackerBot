@@ -10,39 +10,37 @@ async function registerSlashCommands(client) {
             },
             {
                 name: 'progress',
-                description: 'Check your logged encounters',
-                type: 1 // Type 1 is for CHAT_INPUT commands
+                description: 'Check your logged encounters'
+            },
+            {
+                name: 'missing',
+                description: 'Show monsters you have not yet tracked'
             }
         ];
 
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         logger.info('Started refreshing slash commands...');
 
-        // Get all guilds the bot is in
-        const guilds = await client.guilds.fetch();
-        logger.info(`Bot is in ${guilds.size} guilds`);
+        // First, remove all existing commands
+        try {
+            logger.info('Removing existing commands...');
+            await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
+            logger.info('Successfully removed all existing commands');
+        } catch (error) {
+            logger.error('Error removing existing commands:', error);
+        }
 
-        if (guilds.size > 0) {
-            // Register commands for each guild
-            for (const [guildId, guild] of guilds) {
-                logger.info(`Registering commands for guild: ${guild.name} (${guildId})`);
-                try {
-                    await rest.put(
-                        Routes.applicationGuildCommands(client.user.id, guildId),
-                        { body: commands }
-                    );
-                    logger.info(`Successfully registered commands for guild: ${guild.name}`);
-                } catch (error) {
-                    logger.error(`Failed to register commands for guild ${guild.name}:`, error);
-                }
-            }
-        } else {
-            logger.warn('No guilds found, falling back to global command registration');
-            await rest.put(
+        // Register new commands globally
+        try {
+            logger.info(`Registering ${commands.length} commands globally...`);
+            const result = await rest.put(
                 Routes.applicationCommands(client.user.id),
                 { body: commands }
             );
-            logger.info('Successfully registered global commands');
+            logger.info(`Successfully registered ${result.length} global commands`);
+            logger.info('Registered commands:', commands.map(cmd => cmd.name).join(', '));
+        } catch (error) {
+            logger.error('Failed to register global commands:', error);
         }
     } catch (error) {
         logger.error('Error registering slash commands:', error);
