@@ -12,7 +12,7 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
 });
 
 // API URL updated to query only large monsters
-const MONSTER_API_URL = "https://mhw-db.com/monsters?type=large";
+const MONSTER_API_URL = "https://mhw-db.com/monsters";
 
 async function fetchAllMonsters() {
     try {
