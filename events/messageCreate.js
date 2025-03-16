@@ -13,13 +13,10 @@ module.exports = {
             const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
 
-            logger.info(`Received command "${commandName}" from user ${message.author.tag}`);
+            logger.info(`Received command: ${commandName}`);
 
             const command = client.commands.get(commandName);
-            if (!command) {
-                logger.info(`Command "${commandName}" not found`);
-                return;
-            }
+            if (!command) return;
 
             command.execute(message, args);
         } catch (error) {
