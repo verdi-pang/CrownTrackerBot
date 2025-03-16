@@ -31,7 +31,7 @@ module.exports = {
             logger.info(`Attempting to query database for user ${userId}`);
 
             db.all(
-                "SELECT monster_name, size, created_at FROM encounters WHERE user_id = ? ORDER BY created_at DESC",
+                "SELECT monster_name, size FROM encounters WHERE user_id = ?",
                 [userId],
                 async (err, rows) => {
                     try {
@@ -56,19 +56,18 @@ module.exports = {
                         }
 
                         logger.info(`Processing ${rows.length} encounters for user ${userId}`);
-                        const progress = rows
+                        const progressList = rows
                             .map(row => `🦖 **${row.monster_name}** (${row.size})`)
                             .join('\n');
 
                         logger.info('Creating embed with progress data');
                         const embed = {
                             title: '📊 Your Monster Tracking Progress',
-                            description: progress,
+                            description: progressList,
                             color: 0x0099ff,
                             footer: {
                                 text: `Total Encounters: ${rows.length}`
-                            },
-                            timestamp: new Date()
+                            }
                         };
 
                         logger.info('Sending reply with progress embed');
