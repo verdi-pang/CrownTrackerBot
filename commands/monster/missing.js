@@ -2,6 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const fetch = require('node-fetch');
 const logger = require('../../utils/logger');
 
+// Database setup with proper error handling
 const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     if (err) {
         logger.error('Database connection error:', err);
@@ -17,12 +18,18 @@ async function fetchAllMonsters() {
         logger.info('Fetching all monsters from API...');
         const response = await fetch(MONSTER_API_URL);
         if (!response.ok) {
-            logger.error(`API returned status: ${response.status}`);
+            logger.error(`API response not OK: ${response.status} ${response.statusText}`);
             return [];
         }
+
         const monsters = await response.json();
-        logger.info(`Fetched ${monsters.length} monsters from API`);
-        return monsters.map(monster => monster.name.toLowerCase());
+        logger.info(`Raw API response received with ${monsters.length} monsters`);
+
+        // Extract just the names from the monster data
+        const monsterNames = monsters.map(monster => monster.name.toLowerCase());
+
+        logger.info(`Processed ${monsterNames.length} monster names: ${JSON.stringify(monsterNames.slice(0, 3))}`);
+        return monsterNames;
     } catch (error) {
         logger.error('Error fetching monster list:', error);
         return [];
@@ -34,8 +41,17 @@ module.exports = {
     description: 'Show monsters you have not yet tracked',
     async execute(interaction) {
         try {
-            const userId = interaction.user.id;
+            const userId = interaction.user?.id;
             logger.info(`Missing monsters command executed by user: ${userId}`);
+
+            if (!userId) {
+                logger.error('No user ID found in interaction');
+                await interaction.reply({
+                    content: 'Could not identify user. Please try again.',
+                    ephemeral: true
+                });
+                return;
+            }
 
             // Get all possible monsters
             const allMonsters = await fetchAllMonsters();
@@ -48,9 +64,11 @@ module.exports = {
                 return;
             }
 
-            // Get user's tracked monsters
+            // Query encounters from database
+            logger.info(`Attempting to query database for user ${userId}`);
+
             db.all(
-                "SELECT DISTINCT LOWER(monster_name) as monster_name FROM encounters WHERE user_id = ?",
+                "SELECT monster_name, size FROM encounters WHERE user_id = ?",
                 [userId],
                 async (err, rows) => {
                     try {
@@ -63,33 +81,79 @@ module.exports = {
                             return;
                         }
 
-                        const trackedMonsters = rows ? rows.map(row => row.monster_name) : [];
-                        logger.info(`User ${userId} has tracked ${trackedMonsters.length} monsters: ${trackedMonsters.join(', ')}`);
+                        logger.info(`Query completed. Found ${rows ? rows.length : 0} encounters`);
 
-                        const missingMonsters = allMonsters.filter(monster => 
-                            !trackedMonsters.includes(monster.toLowerCase())
-                        );
-                        logger.info(`Found ${missingMonsters.length} missing monsters for user ${userId}`);
-
-                        if (missingMonsters.length === 0) {
+                        if (!rows || rows.length === 0) {
+                            logger.info(`No encounters found for user ${userId}`);
                             await interaction.reply({
-                                content: '🎉 Congratulations! You have tracked all available monsters!',
+                                content: "You haven't logged any monster encounters yet. Use /track to start tracking!",
                                 ephemeral: true
                             });
                             return;
                         }
 
-                        const progressPercentage = Math.round((trackedMonsters.length / allMonsters.length) * 100);
-                        const missingList = missingMonsters
+                        logger.info(`Processing ${rows.length} encounters for user ${userId}`);
+
+                        // Create maps for tracked monsters by size
+                        const trackedSmallest = new Set(
+                            rows
+                                .filter(row => row.size === 'smallest')
+                                .map(row => row.monster_name.toLowerCase())
+                        );
+                        const trackedLargest = new Set(
+                            rows
+                                .filter(row => row.size === 'largest')
+                                .map(row => row.monster_name.toLowerCase())
+                        );
+
+                        // Find missing monsters for each size
+                        const missingSmallest = allMonsters.filter(monster => 
+                            !trackedSmallest.has(monster)
+                        );
+                        const missingLargest = allMonsters.filter(monster => 
+                            !trackedLargest.has(monster)
+                        );
+
+                        logger.info(`Found ${missingSmallest.length} missing smallest and ${missingLargest.length} missing largest monsters`);
+
+                        if (missingSmallest.length === 0 && missingLargest.length === 0) {
+                            await interaction.reply({
+                                content: '🎉 Congratulations! You have tracked all monsters in both size categories!',
+                                ephemeral: true
+                            });
+                            return;
+                        }
+
+                        // Calculate progress percentages
+                        const smallestProgress = Math.round(((allMonsters.length - missingSmallest.length) / allMonsters.length) * 100);
+                        const largestProgress = Math.round(((allMonsters.length - missingLargest.length) / allMonsters.length) * 100);
+
+                        // Create separate lists for missing monsters by size
+                        const smallestList = missingSmallest
+                            .map(monster => `❌ **${monster}**`)
+                            .join('\n');
+                        const largestList = missingLargest
                             .map(monster => `❌ **${monster}**`)
                             .join('\n');
 
                         const embed = {
                             title: '🎯 Missing Monsters',
-                            description: `You have tracked ${trackedMonsters.length}/${allMonsters.length} monsters (${progressPercentage}% complete)\n\nStill need to track:\n${missingList}`,
+                            description: 'Your monster tracking progress by size:',
+                            fields: [
+                                {
+                                    name: `📏 Smallest Monsters (${smallestProgress}% complete)`,
+                                    value: smallestList || 'All smallest sizes tracked! 🎉',
+                                    inline: false
+                                },
+                                {
+                                    name: `📐 Largest Monsters (${largestProgress}% complete)`,
+                                    value: largestList || 'All largest sizes tracked! 🎉',
+                                    inline: false
+                                }
+                            ],
                             color: 0xff6b6b,
                             footer: {
-                                text: `${missingMonsters.length} monsters remaining`
+                                text: `Missing: ${missingSmallest.length} smallest, ${missingLargest.length} largest`
                             }
                         };
 
