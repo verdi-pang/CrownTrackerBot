@@ -23,7 +23,7 @@ const LANGUAGES = [
         label: '正體中文', 
         value: 'zh-Hant', 
         description: 'Display monster names in Chinese',
-        emoji: '🇨🇳'
+        emoji: '🇭🇰'
     }
 ];
 
