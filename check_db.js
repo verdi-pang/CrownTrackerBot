@@ -1,46 +1,60 @@
 const sqlite3 = require('sqlite3').verbose();
+const logger = require('./utils/logger');
 
-// Connect to the database
+// Database connection
 const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     if (err) {
-        console.error('Error connecting to database:', err);
-        return;
+        console.error('Database connection error:', err);
+        process.exit(1);
     }
-    console.log('Connected to the monster_tracker database');
+    console.log('Connected to database for inspection');
+});
+
+// Get list of tables
+db.all("SELECT name FROM sqlite_master WHERE type='table'", (err, tables) => {
+    if (err) {
+        console.error('Error getting tables:', err);
+        process.exit(1);
+    }
     
-    // Check if encounters table exists
-    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='encounters'", (err, row) => {
+    console.log('\nDatabase Tables:');
+    console.log('----------------');
+    tables.forEach(table => {
+        console.log(table.name);
+    });
+    
+    // Check user_preferences table structure
+    db.all("PRAGMA table_info(user_preferences)", (err, columns) => {
         if (err) {
-            console.error('Error checking table:', err);
-            db.close();
-            return;
+            console.error('Error getting user_preferences columns:', err);
+        } else {
+            console.log('\nUser Preferences Table Structure:');
+            console.log('-------------------------------');
+            columns.forEach(col => {
+                console.log(`${col.name}: ${col.type} ${col.dflt_value ? '(Default: ' + col.dflt_value + ')' : ''}`);
+            });
         }
         
-        if (!row) {
-            console.log('Encounters table does not exist yet');
-            db.close();
-            return;
-        }
-        
-        // Query all records
-        db.all("SELECT * FROM encounters", (err, rows) => {
+        // Check encounters table structure
+        db.all("PRAGMA table_info(encounters)", (err, columns) => {
             if (err) {
-                console.error('Error querying table:', err);
-                db.close();
-                return;
-            }
-            
-            if (rows.length === 0) {
-                console.log('Database is empty - no encounters have been tracked');
+                console.error('Error getting encounters columns:', err);
             } else {
-                console.log(`Found ${rows.length} encounters in the database:`);
-                rows.forEach(row => {
-                    console.log(`- User ${row.user_id} tracked ${row.monster_name} (${row.size})`);
+                console.log('\nEncounters Table Structure:');
+                console.log('--------------------------');
+                columns.forEach(col => {
+                    console.log(`${col.name}: ${col.type} ${col.dflt_value ? '(Default: ' + col.dflt_value + ')' : ''}`);
                 });
             }
             
             // Close the database connection
-            db.close();
+            db.close((err) => {
+                if (err) {
+                    console.error('Error closing database:', err);
+                } else {
+                    console.log('\nDatabase connection closed');
+                }
+            });
         });
     });
 });

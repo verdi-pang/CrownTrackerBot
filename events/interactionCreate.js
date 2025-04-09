@@ -2,15 +2,16 @@ const logger = require('../utils/logger');
 const sqlite3 = require('sqlite3').verbose();
 const fetch = require('node-fetch');
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { getMonsterApiUrl } = require('../utils/languageUtils');
 const db = new sqlite3.Database('./monster_tracker.db');
 
-// Updated API URL with Chinese language
-const MONSTER_API_URL = "https://wilds.mhdb.io/zh-Hant/monsters?kind=large";
-
-async function fetchMonsters() {
+async function fetchMonsters(userId) {
     try {
-        logger.info('Fetching monsters from API...');
-        const response = await fetch(MONSTER_API_URL);
+        // Get API URL based on user's language preference
+        const apiUrl = await getMonsterApiUrl(userId);
+        logger.info(`Fetching monsters from API: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl);
         
         if (!response.ok) {
             logger.error(`API response not OK: ${response.status} ${response.statusText}`);
@@ -111,6 +112,21 @@ module.exports = {
                             });
                         }
                     }
+                } else if (interaction.commandName === 'language') {
+                    logger.info(`Language command received from user ${interaction.user.id}`);
+                    try {
+                        const languageCommand = require('../commands/general/language');
+                        await languageCommand.execute(interaction);
+                        logger.info('Language command executed successfully');
+                    } catch (error) {
+                        logger.error('Error executing language command:', error);
+                        if (!interaction.replied) {
+                            await interaction.reply({
+                                content: 'There was an error executing the language command.',
+                                ephemeral: true
+                            });
+                        }
+                    }
                 }
             } else if (interaction.isStringSelectMenu()) {
                 const userId = interaction.user.id;
@@ -131,8 +147,8 @@ module.exports = {
                     // Get user's already tracked monsters
                     const { trackedSmallest, trackedLargest } = await getTrackedMonsters(userId);
                     
-                    // Fetch all available monsters
-                    const monsters = await fetchMonsters();
+                    // Fetch all available monsters with user's language preference
+                    const monsters = await fetchMonsters(userId);
                     if (monsters.length === 0) {
                         return interaction.reply({
                             content: 'Could not fetch monster list. Please try again later.',
@@ -207,6 +223,21 @@ module.exports = {
                             logger.info(`Successfully logged encounter for user ${userId}`);
                         }
                     );
+                } else if (interaction.customId === 'select_language') {
+                    try {
+                        // Handle language selection in the language.js command
+                        const languageCommand = require('../commands/general/language');
+                        await languageCommand.execute(interaction);
+                        logger.info(`Language selection processed for user ${userId}`);
+                    } catch (error) {
+                        logger.error('Error processing language selection:', error);
+                        if (!interaction.replied) {
+                            await interaction.reply({
+                                content: 'There was an error setting your language preference.',
+                                ephemeral: true
+                            });
+                        }
+                    }
                 }
             }
         } catch (error) {

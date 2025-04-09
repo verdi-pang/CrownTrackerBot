@@ -2,6 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const fetch = require('node-fetch');
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const logger = require('../../utils/logger');
+const { getMonsterApiUrl } = require('../../utils/languageUtils');
 
 // Database setup with proper error handling
 const db = new sqlite3.Database('./monster_tracker.db', (err) => {
@@ -17,13 +18,13 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     );
 });
 
-// API URL for monster data - updated to Chinese language endpoint
-const MONSTER_API_URL = "https://wilds.mhdb.io/zh-Hant/monsters?kind=large";
-
-async function fetchMonsters() {
+async function fetchMonsters(userId) {
     try {
-        logger.info('Fetching monsters from API...');
-        const response = await fetch(MONSTER_API_URL);
+        // Get API URL based on user's language preference
+        const apiUrl = await getMonsterApiUrl(userId);
+        logger.info(`Fetching monsters from API: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl);
 
         if (!response.ok) {
             logger.error(`API response not OK: ${response.status} ${response.statusText}`);
@@ -85,8 +86,8 @@ module.exports = {
             const userId = interaction.user.id;
             logger.info(`User ${interaction.user.tag} (${userId}) initiated track command`);
             
-            // Fetch all available monsters
-            const monsters = await fetchMonsters();
+            // Fetch all available monsters with user's language preference
+            const monsters = await fetchMonsters(userId);
             if (monsters.length === 0) {
                 return interaction.reply({
                     content: 'Could not fetch monster list. Please try again later.',

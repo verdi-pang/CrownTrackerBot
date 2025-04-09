@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const logger = require('../../utils/logger');
+const { getUserLanguage, LANGUAGE_DISPLAY } = require('../../utils/languageUtils');
 
 // Database connection with proper error handling
 const db = new sqlite3.Database('./monster_tracker.db', (err) => {
@@ -56,6 +57,11 @@ module.exports = {
                         }
 
                         logger.info(`Processing ${rows.length} encounters for user ${userId}`);
+                        
+                        // Get the user's language setting
+                        const userLanguage = await getUserLanguage(userId);
+                        const languageDisplay = LANGUAGE_DISPLAY[userLanguage] || userLanguage;
+                        
                         const progressList = rows
                             .map(row => `🦖 **${row.monster_name}** (${row.size})`)
                             .join('\n');
@@ -65,6 +71,12 @@ module.exports = {
                             title: '📊 Your Monster Tracking Progress',
                             description: progressList,
                             color: 0x0099ff,
+                            fields: [
+                                {
+                                    name: 'Language Setting',
+                                    value: `Monster names are displayed in: **${languageDisplay}**\nUse /language to change`
+                                }
+                            ],
                             footer: {
                                 text: `Total Encounters: ${rows.length}`
                             }

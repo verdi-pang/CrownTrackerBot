@@ -32,6 +32,10 @@ const slashCommands = [
     {
         name: 'missing',
         description: 'Show monsters you have not yet tracked by size'
+    },
+    {
+        name: 'language',
+        description: 'Set your preferred language for monster names (English/Chinese)'
     }
 ];
 
