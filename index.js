@@ -22,19 +22,19 @@ client.commands = new Collection();
 // Define slash commands
 const slashCommands = [
     {
-        name: 'track',
+        name: 'ct-track',
         description: 'Track a monster encounter by size (smallest/largest)'
     },
     {
-        name: 'progress',
+        name: 'ct-progress',
         description: 'Check your logged monster encounters'
     },
     {
-        name: 'missing',
+        name: 'ct-missing',
         description: 'Show monsters you have not yet tracked by size'
     },
     {
-        name: 'language',
+        name: 'ct-language',
         description: 'Set your preferred language for monster names (English/Chinese)'
     }
 ];
@@ -120,7 +120,7 @@ client.once('ready', async () => {
         }
         
         // Set activity status
-        client.user.setActivity('Use /track to log monsters', { type: ActivityType.Playing });
+        client.user.setActivity('Use /ct-track to log monsters', { type: ActivityType.Playing });
     } catch (error) {
         logger.error('Error in ready event:', error);
     }

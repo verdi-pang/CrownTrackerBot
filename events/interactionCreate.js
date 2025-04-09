@@ -68,7 +68,7 @@ module.exports = {
             if (interaction.isChatInputCommand()) {
                 logger.info(`Processing command: ${interaction.commandName}`);
 
-                if (interaction.commandName === 'track') {
+                if (interaction.commandName === 'ct-track') {
                     try {
                         const trackCommand = require('../commands/monster/track');
                         await trackCommand.execute(interaction);
@@ -82,7 +82,7 @@ module.exports = {
                             });
                         }
                     }
-                } else if (interaction.commandName === 'progress') {
+                } else if (interaction.commandName === 'ct-progress') {
                     logger.info(`Progress command received from user ${interaction.user.id}`);
                     try {
                         const progressCommand = require('../commands/monster/progress');
@@ -97,7 +97,7 @@ module.exports = {
                             });
                         }
                     }
-                } else if (interaction.commandName === 'missing') {
+                } else if (interaction.commandName === 'ct-missing') {
                     logger.info(`Missing monsters command received from user ${interaction.user.id}`);
                     try {
                         const missingCommand = require('../commands/monster/missing');
@@ -112,7 +112,7 @@ module.exports = {
                             });
                         }
                     }
-                } else if (interaction.commandName === 'language') {
+                } else if (interaction.commandName === 'ct-language') {
                     logger.info(`Language command received from user ${interaction.user.id}`);
                     try {
                         const languageCommand = require('../commands/general/language');
@@ -164,7 +164,7 @@ module.exports = {
                     
                     if (availableMonsters.length === 0) {
                         return interaction.reply({
-                            content: `You've already tracked all monsters for ${selectedSize} size! Use /missing to see your progress.`,
+                            content: `You've already tracked all monsters for ${selectedSize} size! Use /ct-missing to see your progress.`,
                             ephemeral: true
                         });
                     }
@@ -194,7 +194,7 @@ module.exports = {
                     
                     if (!selectedSize) {
                         return interaction.reply({
-                            content: 'Please select a size first! Use /track to start over.',
+                            content: 'Please select a size first! Use /ct-track to start over.',
                             ephemeral: true
                         });
                     }
