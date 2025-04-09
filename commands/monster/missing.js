@@ -11,7 +11,8 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     logger.info('Connected to monster tracking database for missing command');
 });
 
-const MONSTER_API_URL = "https://mhw-db.com/monsters?type=large";
+// Updated API URL with Chinese language
+const MONSTER_API_URL = "https://wilds.mhdb.io/zh-Hant/monsters?kind=large";
 
 async function fetchAllMonsters() {
     try {

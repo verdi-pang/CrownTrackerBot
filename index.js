@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType } = require('discord.js');
 const { loadCommands } = require('./handlers/commandHandler');
 const fs = require('fs').promises;
 const path = require('path');
@@ -19,48 +19,57 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Register slash commands before loading other commands
+// Define slash commands
+const slashCommands = [
+    {
+        name: 'track',
+        description: 'Track a monster encounter by size (smallest/largest)'
+    },
+    {
+        name: 'progress',
+        description: 'Check your logged monster encounters'
+    },
+    {
+        name: 'missing',
+        description: 'Show monsters you have not yet tracked by size'
+    }
+];
+
+// Register slash commands
 async function registerGlobalCommands() {
-    const commands = [
-        {
-            name: 'track',
-            description: 'Track a monster encounter'
-        },
-        {
-            name: 'progress',
-            description: 'Check your logged encounters'
-        },
-        {
-            name: 'missing',
-            description: 'Show monsters you have not yet tracked'
-        }
-    ];
-
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-
     try {
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+        
         logger.info('Started refreshing slash commands...');
+        logger.info(`Registering ${slashCommands.length} commands: ${slashCommands.map(cmd => cmd.name).join(', ')}`);
 
-        // First, remove all existing commands
-        await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
-        logger.info('Successfully removed all existing commands');
-
-        // Register new commands
+        // First, delete all existing commands to avoid duplicates
+        logger.info('Deleting existing commands...');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: [] }
+        );
+        
+        // Register fresh commands
         const result = await rest.put(
             Routes.applicationCommands(client.user.id),
-            { body: commands }
+            { body: slashCommands }
         );
-        logger.info(`Successfully registered ${result.length} commands: ${commands.map(cmd => cmd.name).join(', ')}`);
-
-        // Verify the registration
+        
+        logger.info(`Successfully registered ${result.length} commands`);
+        
+        // Verify registration
         const registeredCommands = await rest.get(Routes.applicationCommands(client.user.id));
         logger.info(`Currently registered commands: ${registeredCommands.map(cmd => cmd.name).join(', ')}`);
+        
+        return true;
     } catch (error) {
         logger.error('Error registering slash commands:', error);
+        return false;
     }
 }
 
-// Load commands
+// Load commands (for command handling)
 loadCommands(client);
 
 // Load events
@@ -94,12 +103,20 @@ if (!token) {
 
 // Register commands only once when bot is ready
 client.once('ready', async () => {
-    logger.info(`Logged in as ${client.user.tag}`);
+    logger.info(`Logged in as ${client.user.tag} (ID: ${client.user.id})`);
+    
     try {
         // Register slash commands
-        await registerGlobalCommands();
+        const registered = await registerGlobalCommands();
+        
+        if (registered) {
+            logger.info('Commands registered successfully');
+        } else {
+            logger.warn('Command registration failed');
+        }
+        
         // Set activity status
-        client.user.setActivity('Use /track to log monsters', { type: 'PLAYING' });
+        client.user.setActivity('Use /track to log monsters', { type: ActivityType.Playing });
     } catch (error) {
         logger.error('Error in ready event:', error);
     }

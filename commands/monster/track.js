@@ -17,8 +17,8 @@ const db = new sqlite3.Database('./monster_tracker.db', (err) => {
     );
 });
 
-// API URL for monster data
-const MONSTER_API_URL = "https://mhw-db.com/monsters?type=large";
+// API URL for monster data - updated to Chinese language endpoint
+const MONSTER_API_URL = "https://wilds.mhdb.io/zh-Hant/monsters?kind=large";
 
 async function fetchMonsters() {
     try {
@@ -46,50 +46,76 @@ async function fetchMonsters() {
     }
 }
 
+// Get user's already tracked monsters by size
+async function getTrackedMonsters(userId) {
+    return new Promise((resolve, reject) => {
+        db.all(
+            "SELECT monster_name, size FROM encounters WHERE user_id = ?",
+            [userId],
+            (err, rows) => {
+                if (err) {
+                    logger.error(`Database query error for tracked monsters: ${err}`);
+                    return reject(err);
+                }
+                
+                // Create sets for tracked monsters by size
+                const trackedSmallest = new Set(
+                    rows
+                        .filter(row => row.size === 'smallest')
+                        .map(row => row.monster_name.toLowerCase())
+                );
+                const trackedLargest = new Set(
+                    rows
+                        .filter(row => row.size === 'largest')
+                        .map(row => row.monster_name.toLowerCase())
+                );
+                
+                logger.info(`User ${userId} has tracked ${trackedSmallest.size} smallest and ${trackedLargest.size} largest monsters`);
+                resolve({ trackedSmallest, trackedLargest });
+            }
+        );
+    });
+}
+
 module.exports = {
     name: 'track',
     description: 'Track monster encounters and sizes',
     async execute(interaction) {
         try {
-            logger.info(`User ${interaction.user.tag} initiated track command`);
+            const userId = interaction.user.id;
+            logger.info(`User ${interaction.user.tag} (${userId}) initiated track command`);
+            
+            // Fetch all available monsters
             const monsters = await fetchMonsters();
-
             if (monsters.length === 0) {
                 return interaction.reply({
                     content: 'Could not fetch monster list. Please try again later.',
                     ephemeral: true
                 });
             }
+            
+            // Get user's already tracked monsters
+            const { trackedSmallest, trackedLargest } = await getTrackedMonsters(userId);
 
-            const monsterMenu = new StringSelectMenuBuilder()
-                .setCustomId('select_monster')
-                .setPlaceholder('Choose a monster')
-                .addOptions(
-                    monsters.map(monster => ({
-                        label: monster.name,
-                        value: monster.name.toLowerCase(),
-                        description: `Track ${monster.name}`
-                    })).slice(0, 25)
-                );
-
+            // Display select menu with size selection first
             const sizeMenu = new StringSelectMenuBuilder()
                 .setCustomId('select_size')
-                .setPlaceholder('Choose a size')
+                .setPlaceholder('Choose a size to track')
                 .addOptions([
                     { label: 'Smallest', value: 'smallest', description: 'Record as smallest seen' },
                     { label: 'Largest', value: 'largest', description: 'Record as largest seen' }
                 ]);
 
-            const row1 = new ActionRowBuilder().addComponents(monsterMenu);
-            const row2 = new ActionRowBuilder().addComponents(sizeMenu);
+            const row = new ActionRowBuilder().addComponents(sizeMenu);
 
             await interaction.reply({
-                content: 'Select a monster and size to track:',
-                components: [row1, row2],
+                content: 'First, select which size you want to track:',
+                components: [row],
                 ephemeral: true
             });
-
-            logger.info('Track command executed successfully');
+            
+            // We'll handle the monster selection after size is chosen in the interactionCreate.js file
+            logger.info('Track command executed successfully - waiting for size selection');
         } catch (error) {
             logger.error('Error in track command:', error);
             if (!interaction.replied) {
